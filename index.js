@@ -44,12 +44,19 @@ const AUDIT_MEMBER_KICK = 20;
 const AUDIT_MEMBER_BAN_ADD = 22;
 
 async function sendMemberLogEmbed(guild, embed) {
-    if (!moderationLogChannelId) return;
+    if (!moderationLogChannelId) {
+        console.warn('⚠️ MEMBER_LOG_CHANNEL_ID/LOG_CHANNEL_ID non configurato.');
+        return;
+    }
 
     const logChannel = guild.channels.cache.get(moderationLogChannelId)
-        || await guild.channels.fetch(moderationLogChannelId).catch(() => null);
+        || await guild.channels.fetch(moderationLogChannelId).catch(() => null)
+        || await client.channels.fetch(moderationLogChannelId).catch(() => null);
 
-    if (!logChannel || !logChannel.isTextBased()) return;
+    if (!logChannel || !logChannel.isTextBased()) {
+        console.warn(`⚠️ Canale log non trovato o non testuale: ${moderationLogChannelId}`);
+        return;
+    }
 
     await logChannel.send({ embeds: [embed] });
 }
@@ -64,7 +71,7 @@ async function isRecentModerationAction(guild, eventType, userId) {
 }
 
 // === AVVIO BOT
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log(`✅ SkullBot online come ${client.user.tag}`);
 
     await updateMemberCount(client);
@@ -81,15 +88,20 @@ client.on('guildMemberAdd', welcome);
 
 client.on('guildMemberRemove', async member => {
     try {
+        // Piccolo ritardo: l'audit log del kick può arrivare dopo l'evento di rimozione
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
         const wasKicked = await isRecentModerationAction(member.guild, AUDIT_MEMBER_KICK, member.id);
         const wasBanned = await isRecentModerationAction(member.guild, AUDIT_MEMBER_BAN_ADD, member.id);
 
         if (wasBanned) return;
 
+        const userTag = member.user?.tag || 'Utente sconosciuto';
+
         const embed = {
             color: wasKicked ? 0xffa500 : 0xff0000,
             title: wasKicked ? '👢 Utente espulso dal server' : '🚪 Utente uscito dal server',
-            description: `<@${member.id}> (**${member.user.tag}**)`,
+            description: `<@${member.id}> (**${userTag}**)`,
             fields: [
                 { name: 'User ID', value: member.id, inline: true },
                 { name: 'Azione', value: wasKicked ? 'Espulsione (Kick)' : 'Uscita volontaria', inline: true }
