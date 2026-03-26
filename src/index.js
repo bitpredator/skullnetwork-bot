@@ -643,14 +643,10 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (wasMovedFromAnotherVoiceChannel) {
         const allowedMovers = new Set([ownerId, guildOwnerId]);
         const movedByAllowedUser = await wasMovedByAllowedUser(destinationChannel.guild, newState.id, allowedMovers);
-        const couldNotValidateMove = movedByAllowedUser === null;
-        if (movedByAllowedUser === false) {
-            await newState.disconnect('Canale vocale privato: puoi entrare solo se vieni spostato dal proprietario del canale o dal proprietario del server.').catch(() => null);
-            return;
-        }
-
-        // Se non possiamo validare via audit log, non blocchiamo il move per non impedire il lavoro del proprietario.
-        if (couldNotValidateMove) {
+        
+        // Gli audit log non sono sempre affidabili in tempo reale: per evitare espulsioni involontarie
+        // dopo uno spostamento nel canale privato, non blocchiamo mai il move se l'utente arriva da un altro vocale.
+        if (movedByAllowedUser !== true) {
             console.warn(`Impossibile validare audit log move per ${newState.id} in ${destinationChannel.id}.`);
         }
 
